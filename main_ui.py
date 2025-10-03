@@ -379,7 +379,7 @@ class ExpenseTrackerApp(QWidget):
         export_pdf_month(self.user_id, self)
 
     # --- Settings ---
-    def sync_to_google_sheets(self):
+    def sync_to_google_sheets(self): 
         QMessageBox.information(self, "Google Sheets", "Sync optional. Requires gspread & oauth2client + JSON key.")
 
     def toggle_theme(self):
