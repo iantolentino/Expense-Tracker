@@ -1,9 +1,10 @@
-# main_ui.py (modernized)
+# main_ui.py (with sidebar navigation)
 import sys
 from PyQt5.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTabWidget,
-    QGroupBox, QGridLayout, QDateEdit, QComboBox, QLineEdit, QTableWidget,
-    QTableWidgetItem, QHeaderView, QApplication, QMessageBox, QStyle
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
+    QGroupBox, QGridLayout, QDateEdit, QComboBox, QLineEdit,
+    QTableWidget, QTableWidgetItem, QHeaderView, QApplication,
+    QMessageBox, QStyle, QListWidget, QListWidgetItem, QStackedWidget
 )
 from PyQt5.QtCore import Qt, QDate
 from PyQt5.QtGui import QFont
@@ -22,41 +23,57 @@ class ExpenseTrackerApp(QWidget):
         self.user_id = user_id
         self.username = username
         self.setWindowTitle(f"Expense Tracker — {username or ('User ' + str(user_id))}")
-        self.showMaximized()
+        self.resize(1200, 700)
         self.setFont(QFont("Segoe UI", 10))
 
         # Themes
         self.is_dark = False
         self.light_style = """
             QWidget { font-family: 'Segoe UI'; font-size: 11pt; }
-            QPushButton {
-                background-color: #4CAF50; color: white;
-                border-radius: 6px; padding: 6px 12px;
+            QListWidget {
+                background-color: #2C3E50; color: #ecf0f1;
+                border: none;
             }
-            QPushButton:hover { background-color: #45a049; }
-            QLineEdit, QComboBox, QDateEdit {
-                padding: 6px; border: 1px solid #ccc; border-radius: 4px;
+            QListWidget::item {
+                padding: 12px;
             }
-            QTabWidget::pane { border: 1px solid #ccc; border-radius: 8px; }
+            QListWidget::item:selected {
+                background: #34495E; font-weight: bold;
+            }
         """
         self.dark_style = """
             QWidget { background: #121212; color: #eee; font-family: 'Segoe UI'; font-size: 11pt; }
-            QPushButton {
-                background-color: #333; color: #fff;
-                border-radius: 6px; padding: 6px 12px;
+            QListWidget {
+                background-color: #1E1E1E; color: #ccc;
+                border: none;
             }
-            QPushButton:hover { background-color: #444; }
-            QLineEdit, QComboBox, QDateEdit {
-                padding: 6px; border: 1px solid #555; border-radius: 4px; background: #222; color: #eee;
+            QListWidget::item {
+                padding: 12px;
             }
-            QTabWidget::pane { border: 1px solid #555; border-radius: 8px; }
+            QListWidget::item:selected {
+                background: #333; color: #fff; font-weight: bold;
+            }
         """
         self.setStyleSheet(self.light_style)
 
-        # Main layout
-        v = QVBoxLayout()
+        # Main layout (sidebar + content)
+        main_layout = QHBoxLayout()
+        self.setLayout(main_layout)
+
+        # Sidebar
+        self.sidebar = QListWidget()
+        self.sidebar.setFixedWidth(180)
+        self.sidebar.setFont(QFont("Segoe UI", 10))
+        self.sidebar.addItem(QListWidgetItem("📊 Dashboard"))
+        self.sidebar.addItem(QListWidgetItem("💰 Transactions"))
+        self.sidebar.addItem(QListWidgetItem("🏷 Categories"))
+        self.sidebar.addItem(QListWidgetItem("📑 Reports"))
+        self.sidebar.addItem(QListWidgetItem("⚙ Settings"))
+        self.sidebar.currentRowChanged.connect(self.switch_page)
+        main_layout.addWidget(self.sidebar)
 
         # Top bar
+        right_panel = QVBoxLayout()
         top_row = QHBoxLayout()
         self.lbl_user = QLabel(f"User: {self.username or user_id}")
         self.lbl_user.setStyleSheet("font-weight: bold; font-size: 12pt;")
@@ -65,27 +82,38 @@ class ExpenseTrackerApp(QWidget):
         self.theme_btn = QPushButton("🌙 Theme")
         self.theme_btn.clicked.connect(self.toggle_theme)
         top_row.addWidget(self.theme_btn)
-        v.addLayout(top_row)
+        right_panel.addLayout(top_row)
 
-        # Tabs
-        self.tabs = QTabWidget()
-        self.tabs.addTab(self.build_dashboard_tab(), "📊 Dashboard")
-        self.tabs.addTab(self.build_transactions_tab(), "💰 Transactions")
-        self.tabs.addTab(self.build_categories_tab(), "🏷 Categories")
-        self.tabs.addTab(self.build_reports_tab(), "📑 Reports")
-        self.tabs.addTab(self.build_settings_tab(), "⚙ Settings")
-        v.addWidget(self.tabs)
+        # Stacked pages
+        self.pages = QStackedWidget()
+        self.page_dashboard = self.build_dashboard_page()
+        self.page_transactions = self.build_transactions_page()
+        self.page_categories = self.build_categories_page()
+        self.page_reports = self.build_reports_page()
+        self.page_settings = self.build_settings_page()
 
-        self.setLayout(v)
+        self.pages.addWidget(self.page_dashboard)
+        self.pages.addWidget(self.page_transactions)
+        self.pages.addWidget(self.page_categories)
+        self.pages.addWidget(self.page_reports)
+        self.pages.addWidget(self.page_settings)
 
-        # Init data
+        right_panel.addWidget(self.pages)
+        main_layout.addLayout(right_panel)
+
+        # Default
+        self.sidebar.setCurrentRow(0)
         self.refresh_categories()
         self.refresh_transactions()
         self.update_dashboard()
 
+    # --- Sidebar navigation ---
+    def switch_page(self, index):
+        self.pages.setCurrentIndex(index)
+
     # --- Dashboard ---
-    def build_dashboard_tab(self):
-        tab = QWidget()
+    def build_dashboard_page(self):
+        page = QWidget()
         layout = QVBoxLayout()
         summary_row = QHBoxLayout()
         self.lbl_month = QLabel("Month total: ₱0.00")
@@ -97,14 +125,14 @@ class ExpenseTrackerApp(QWidget):
         layout.addLayout(summary_row)
         self.canvas = MplCanvas(self, width=8, height=4, dpi=100)
         layout.addWidget(self.canvas)
-        tab.setLayout(layout)
-        return tab
+        page.setLayout(layout)
+        return page
 
     # --- Transactions ---
-    def build_transactions_tab(self):
-        tab = QWidget()
+    def build_transactions_page(self):
+        page = QWidget()
         g = QGridLayout()
-        tab.setLayout(g)
+        page.setLayout(g)
 
         # Left: input form
         formbox = QGroupBox("➕ Add Transaction")
@@ -158,11 +186,11 @@ class ExpenseTrackerApp(QWidget):
         rlay.addLayout(btn_row)
         right_box.setLayout(rlay)
         g.addWidget(right_box, 0, 1)
-        return tab
+        return page
 
     # --- Categories ---
-    def build_categories_tab(self):
-        tab = QWidget()
+    def build_categories_page(self):
+        page = QWidget()
         v = QVBoxLayout()
         self.category_list = QComboBox()
         v.addWidget(QLabel("Categories"))
@@ -178,12 +206,12 @@ class ExpenseTrackerApp(QWidget):
         delc.clicked.connect(self.remove_category)
         h.addWidget(delc)
         v.addLayout(h)
-        tab.setLayout(v)
-        return tab
+        page.setLayout(v)
+        return page
 
     # --- Reports ---
-    def build_reports_tab(self):
-        tab = QWidget()
+    def build_reports_page(self):
+        page = QWidget()
         v = QVBoxLayout()
         h = QHBoxLayout()
         export_csv_btn = QPushButton("Export CSV")
@@ -202,12 +230,12 @@ class ExpenseTrackerApp(QWidget):
         draw_btn.clicked.connect(self.draw_chart)
         chart_row.addWidget(draw_btn)
         v.addLayout(chart_row)
-        tab.setLayout(v)
-        return tab
+        page.setLayout(v)
+        return page
 
     # --- Settings ---
-    def build_settings_tab(self):
-        tab = QWidget()
+    def build_settings_page(self):
+        page = QWidget()
         v = QVBoxLayout()
         v.addWidget(QLabel("Cloud Sync (Google Sheets) — optional"))
         self.gs_path_edit = QLineEdit()
@@ -220,10 +248,10 @@ class ExpenseTrackerApp(QWidget):
         sync_btn.clicked.connect(self.sync_to_google_sheets)
         v.addWidget(sync_btn)
         v.addWidget(QLabel("Authentication: local accounts only."))
-        tab.setLayout(v)
-        return tab
+        page.setLayout(v)
+        return page
 
-    # --- Data / CRUD ---
+    # --- CRUD / Data ---
     def refresh_categories(self):
         cats = get_categories(self.user_id)
         self.cat_combo.clear()
@@ -268,7 +296,7 @@ class ExpenseTrackerApp(QWidget):
 
     def refresh_transactions(self):
         rows = list_transactions(self.user_id)
-        self.all_rows = rows  # keep unfiltered copy
+        self.all_rows = rows
         self.populate_table(rows)
 
     def filter_transactions(self, text):
@@ -345,9 +373,6 @@ class ExpenseTrackerApp(QWidget):
 
     # --- Export ---
     def export_csv_all(self):
-        con = get_db_connection()
-        df = pd.read_sql_query("SELECT * FROM transactions WHERE user_id=? ORDER BY date desc", con, params=(self.user_id,))
-        con.close()
         export_transactions_csv(self.user_id, self)
 
     def export_pdf_month(self):
