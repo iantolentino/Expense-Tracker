@@ -1,0 +1,7 @@
+PyQt5>=5.15
+pandas
+matplotlib
+PyPDF2
+reportlab
+gspread
+oauth2client
